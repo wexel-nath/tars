@@ -124,7 +124,9 @@ maybe_create_database
 echo "*:$DB_PORT:$DB_NAME:$DB_USER:$DB_PASS" > "$PGPASSFILE"
 
 maybe_create_schema
-maybe_run_updates
+
+# uncomment when update files exist
+#maybe_run_updates
 
 echo "Database initialization complete."
 
