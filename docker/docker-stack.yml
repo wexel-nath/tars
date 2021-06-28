@@ -1,0 +1,53 @@
+version: '3.1'
+
+networks:
+  tars-backend:
+
+services:
+  bot:
+    image: "wexel/tars-process:${VERSION:-latest}"
+    environment:
+      COIN_API_KEY: "${COIN_API_KEY:-}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_NAME: "${DB_NAME:-tars}"
+      DB_PASS: "${DB_PASS:-4Me2Test}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_USER: "${DB_USER:-tars}"
+      VERSION: "${VERSION:-latest}"
+    networks:
+      - tars-backend
+    deploy:
+      restart_policy:
+        condition: none
+
+  db:
+    image: postgres:13-alpine
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASS:-4Me2Test}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+    networks:
+      - tars-backend
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  db-init:
+    image: "wexel/tars-db-init:${VERSION:-latest}"
+    environment:
+      DB_HOST: "${DB_HOST:-db}"
+      DB_NAME: "${DB_NAME:-tars}"
+      DB_PASS: "${DB_PASS:-4Me2Test}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_USER: "${DB_USER:-tars}"
+      POSTGRES_PASS: "${POSTGRES_PASS:-4Me2Test}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+    networks:
+      - tars-backend
+    deploy:
+      restart_policy:
+        condition: none
+
+volumes:
+  postgres_data:

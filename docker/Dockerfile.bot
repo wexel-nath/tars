@@ -1,0 +1,32 @@
+# build binary
+FROM golang:1.16-alpine as builder
+
+ENV CGO_ENABLED 0
+
+RUN apk update \
+	&& apk add --no-cache git ca-certificates
+
+WORKDIR /app
+COPY . .
+
+# Fetch dependencies using go mod.
+RUN go mod download
+
+# Unit tests
+RUN go test ./...
+
+# Build the binary.
+RUN GOOS=linux \
+	GOARCH=amd64 \
+	go build \
+		-ldflags="-w -s" \
+		-o /tars \
+		cmd/bot/main.go
+
+# Build image
+FROM scratch
+
+COPY --from=builder /tars /tars
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+ENTRYPOINT ["/tars"]
