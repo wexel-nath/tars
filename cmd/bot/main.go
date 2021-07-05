@@ -18,7 +18,7 @@ func main() {
 		log.Error(err)
 	}
 
-	err = bot.Start()
+	err = bot.Start(nil)
 	if err != nil {
 		log.Error(err)
 	}
