@@ -2,16 +2,13 @@ package market
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
 	"time"
-)
 
-const (
-	btcMarketURL = "https://api.getwexel.com/fake-btc-markets"
-
-	InitialDate = "2016-01-01T00:00:00Z"
+	"tars/pkg/config"
 )
 
 var (
@@ -23,25 +20,36 @@ type httpClient struct{
 	client  *http.Client
 }
 
+func defaultClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Second}
+}
+
+// only for testing locally
+func insecureClient() *http.Client {
+	c := defaultClient()
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	c.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+	return c
+}
+
 func getClient() *httpClient {
 	if client == nil {
 		client = &httpClient{
-			baseURL: btcMarketURL,
-			client:  &http.Client{
-				Timeout: 5*time.Second,
-			},
+			baseURL: config.Get().MarketBaseURL,
+			client:  insecureClient(),
 		}
 	}
 	return client
 }
 
-func (c *httpClient) request(
+func request(
 	method string,
 	path string,
 	body []byte,
 	params map[string]string,
 	headers map[string]string,
 ) (*http.Response, error) {
+	c := getClient()
 	url := c.baseURL + path
 	request, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
@@ -66,9 +74,16 @@ func get(
 	params map[string]string,
 	headers map[string]string,
 ) (*http.Response, error) {
-	c := getClient()
+	return request(http.MethodGet, path, nil, params, headers)
+}
 
-	return c.request(http.MethodGet, path, nil, params, headers)
+func post(
+	path string,
+	body []byte,
+	params map[string]string,
+	headers map[string]string,
+) (*http.Response, error) {
+	return request(http.MethodPost, path, body, params, headers)
 }
 
 func unmarshalBody(r *http.Response, v interface{}) error {

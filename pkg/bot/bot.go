@@ -1,34 +1,35 @@
 package bot
 
 import (
-	"fmt"
-	"tars/pkg/market"
 	"time"
+
+	"tars/pkg/config"
+	"tars/pkg/log"
 )
 
 type cycle interface{
-	run() error
+	run(timestamp time.Time) (bool, error)
 }
 
 func Start(c cycle) error {
-	//for true {
-	//	err := c.run()
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	initialDate := config.Get().InitialDate
+	log.Info("Starting bot from initial date: %s", initialDate)
 
-	timestamp, err := time.Parse(time.RFC3339, market.InitialDate)
+	timestamp, err := time.Parse(time.RFC3339, initialDate)
 	if err != nil {
 		return err
 	}
 
-	ticker, err := market.GetTickerForTimestamp(market.EthUSD, timestamp)
-	if err != nil {
-		return err
+	exit := false
+	for !exit {
+		exit, err = c.run(timestamp)
+		if err != nil {
+			return err
+		}
+
+		timestamp = timestamp.Add(config.Get().GetTickerDelta())
 	}
 
-	fmt.Println(fmt.Sprintf("%#v", ticker))
 	return nil
 }
 
