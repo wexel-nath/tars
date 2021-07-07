@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"tars/pkg/config"
 	"tars/pkg/helper/parse"
+	"tars/pkg/log"
 	"tars/pkg/market"
 )
 
@@ -22,12 +24,32 @@ type Position struct{
 	ExternalOrderID *string
 }
 
-func (p Position) toOrderRequest() market.OrderRequest {
+func (p Position) TargetPrice() float64 {
+	return p.Price * config.Get().PositionTarget
+}
+
+func (p Position) Cost() float64 {
+	return p.Price * p.Amount
+}
+
+func (p Position) enterOrderRequest() market.OrderRequest {
 	request := market.OrderRequest{
 		MarketID: p.MarketID,
 		Price:    fmt.Sprintf("%f", p.Price),
 		Amount:   fmt.Sprintf("%f", p.Amount),
-		Side:     getOrderSide(p.Type),
+		Side:     enterOrderSide(p.Type),
+		Type:     market.TypeLimit, // always limit for now
+	}
+
+	return request
+}
+
+func (p Position) exitOrderRequest(price float64) market.OrderRequest {
+	request := market.OrderRequest{
+		MarketID: p.MarketID,
+		Price:    fmt.Sprintf("%f", price),
+		Amount:   fmt.Sprintf("%f", p.Amount),
+		Side:     exitOrderSide(p.Type),
 		Type:     market.TypeLimit, // always limit for now
 	}
 
@@ -56,6 +78,22 @@ func positionFromRow(row map[string]interface{}) (p Position, err error) {
 	}
 
 	return position, nil
+}
+
+func positionsFromRows(rows []map[string]interface{}) ([]Position, error) {
+	positions := make([]Position, 0)
+
+	for _, row := range rows {
+		p, err := positionFromRow(row)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+
+		positions = append(positions, p)
+	}
+
+	return positions, nil
 }
 
 func newPosition(
@@ -129,7 +167,7 @@ func Open(
 		return Position{}, err
 	}
 
-	request := p.toOrderRequest()
+	request := p.enterOrderRequest()
 	order, err := market.PlaceOrder(request, p.Created)
 	if err != nil {
 		return Position{}, err
@@ -162,4 +200,49 @@ func Open(
 
 	status := StatusOpen
 	return updatePosition(p, &status, &totalFee, nil, &order.ID)
+}
+
+func (p Position) Close(price float64, timestamp time.Time) (Position, error) {
+	request := p.exitOrderRequest(price)
+	order, err := market.PlaceOrder(request, timestamp)
+	if err != nil {
+		return Position{}, err
+	}
+
+	if order.Status != market.StatusFullyMatched {
+		// log/alert
+
+		// try cancel order | position_event??
+
+		// mark position as cancelled
+		status := StatusCancelled
+		return updatePosition(p, &status, nil, nil, &order.ID)
+	}
+
+	orderTrades, err := market.GetTradesByOrderID(order.ID)
+	if err != nil {
+		return Position{}, err
+	}
+
+	totalFee := 0.0
+	for _, trade := range orderTrades {
+		fee, err := parse.StringToFloat(trade.Fee)
+		if err != nil {
+			return Position{}, err
+		}
+
+		totalFee += fee
+	}
+
+	status := StatusClosed
+	return updatePosition(p, &status, nil, &totalFee, &order.ID)
+}
+
+func GetOpenPositions() ([]Position, error) {
+	rows, err := selectOpenPositions()
+	if err != nil {
+		return nil, err
+	}
+
+	return positionsFromRows(rows)
 }

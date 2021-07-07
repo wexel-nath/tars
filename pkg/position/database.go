@@ -101,3 +101,13 @@ func updatePositionRow(
 
 	return database.QueryRow(query, params, positionColumns)
 }
+
+func selectOpenPositions() ([]map[string]interface{}, error) {
+	query := `
+		SELECT ` + positionColumnsString + `
+		FROM position
+		WHERE position_status = 'Open'
+	`
+
+	return database.QueryRows(query, nil, positionColumns)
+}

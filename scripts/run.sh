@@ -9,18 +9,24 @@ PROJECT_NAME="${PROJECT_NAME:-tars}"
 export VERSION="${VERSION:-$(cat "$PROJ_DIR/VERSION")}"
 
 # local fake-btc-market values
-export MARKET_ID='BTC-USD'
-export MARKET_BASE_URL='https://172.21.0.1/fake-btc-markets'
 export INITIAL_DATE='2018-01-01T01:00:00Z'
-export TICKER_DELTA='60'
+export MARKET_BASE_URL='https://172.21.0.1/fake-btc-markets'
+export MARKET_ID='BTC-USD'
+export MAX_EXPOSURE='10000'
+export POSITION_ENTER='0.985'
 export POSITION_SIZE='1000'
+export POSITION_TARGET='1.015'
+export TICKER_DELTA='60'
 
 # prod fake-btc-market values
-#export MARKET_ID='ETH-USD'
-#export MARKET_BASE_URL='https://api.getwexel.com/fake-btc-markets'
 #export INITIAL_DATE='2016-01-01T00:10:00Z'
-#export TICKER_DELTA='10'
+#export MARKET_BASE_URL='https://api.getwexel.com/fake-btc-markets'
+#export MARKET_ID='ETH-USD'
+#export MAX_EXPOSURE='10000'
+#export POSITION_ENTER='0.985'
 #export POSITION_SIZE='1000'
+#export POSITION_TARGET='1.015'
+#export TICKER_DELTA='10'
 
 deploy() {
 	docker stack deploy \
@@ -33,11 +39,12 @@ run() {
 	name="tars_$1"
 
 	docker run \
-		-e "MARKET_ID=$MARKET_ID" \
-		-e "MARKET_BASE_URL=$MARKET_BASE_URL" \
 		-e "INITIAL_DATE=$INITIAL_DATE" \
-		-e "TICKER_DELTA=$TICKER_DELTA" \
+		-e "MARKET_BASE_URL=$MARKET_BASE_URL" \
+		-e "MARKET_ID=$MARKET_ID" \
+		-e "MAX_EXPOSURE=$MAX_EXPOSURE" \
 		-e "POSITION_SIZE=$POSITION_SIZE" \
+		-e "TICKER_DELTA=$TICKER_DELTA" \
 		--rm \
 		--name "$name" \
 		"$image:$VERSION"

@@ -7,11 +7,14 @@ services:
   bot:
     image: "wexel/tars-bot:${VERSION:-latest}"
     environment:
-      MARKET_ID: "${MARKET_ID:-}"
-      MARKET_BASE_URL: "${MARKET_BASE_URL:-}"
       INITIAL_DATE: "${INITIAL_DATE:-}"
-      TICKER_DELTA: "${TICKER_DELTA:-}"
+      MARKET_BASE_URL: "${MARKET_BASE_URL:-}"
+      MARKET_ID: "${MARKET_ID:-}"
+      MAX_EXPOSURE: "${MAX_EXPOSURE:-}"
+      POSITION_ENTER: "${POSITION_ENTER:-}"
       POSITION_SIZE: "${POSITION_SIZE:-}"
+      POSITION_TARGET: "${POSITION_TARGET:-}"
+      TICKER_DELTA: "${TICKER_DELTA:-}"
       DB_HOST: "${DB_HOST:-db}"
       DB_NAME: "${DB_NAME:-tars}"
       DB_PASS: "${DB_PASS:-4Me2Test}"

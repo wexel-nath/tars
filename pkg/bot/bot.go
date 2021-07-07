@@ -20,9 +20,9 @@ func Start(c cycle) error {
 		return err
 	}
 
-	exit := false
-	for !exit {
-		exit, err = c.run(timestamp)
+	//exit := false
+	for i := 0; i < 50; i++ {
+		_, err = c.run(timestamp)
 		if err != nil {
 			return err
 		}

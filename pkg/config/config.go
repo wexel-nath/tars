@@ -16,11 +16,14 @@ type Config struct{
 	Version  string `env:"VERSION"`
 
 	// Bot
-	MarketID      string  `env:"MARKET_ID"`
-	MarketBaseURL string  `env:"MARKET_BASE_URL"`
-	InitialDate   string  `env:"INITIAL_DATE"`
-	TickerDelta   int     `env:"TICKER_DELTA"`
-	PositionSize  float64 `env:"POSITION_SIZE"`
+	InitialDate    string  `env:"INITIAL_DATE"`
+	MarketBaseURL  string  `env:"MARKET_BASE_URL"`
+	MarketID       string  `env:"MARKET_ID"`
+	MaxExposure    float64 `env:"MAX_EXPOSURE"`
+	PositionEnter  float64 `env:"POSITION_ENTER"`
+	PositionSize   float64 `env:"POSITION_SIZE"`
+	PositionTarget float64 `env:"POSITION_TARGET"`
+	TickerDelta    int     `env:"TICKER_DELTA"`
 
 	// Database
 	DatabaseHost string `env:"DB_HOST"`
