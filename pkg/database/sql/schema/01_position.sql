@@ -8,5 +8,7 @@ CREATE TABLE position (
     position_status   TEXT            NOT NULL,
     position_created  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     position_updated  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    open_fee          NUMERIC(32, 16),
+    close_fee         NUMERIC(32, 16),
     external_order_id TEXT
 );

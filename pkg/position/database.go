@@ -1,7 +1,9 @@
 package position
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"tars/pkg/database"
 )
@@ -15,6 +17,8 @@ const (
 	columnPositionStatus  = "position_status"
 	columnPositionCreated = "position_created"
 	columnPositionUpdated = "position_updated"
+	columnOpenFee         = "open_fee"
+	columnCloseFee        = "close_fee"
 	columnExternalOrderID = "external_order_id"
 )
 
@@ -28,6 +32,8 @@ var (
 		columnPositionStatus,
 		columnPositionCreated,
 		columnPositionUpdated,
+		columnOpenFee,
+		columnCloseFee,
 		columnExternalOrderID,
 	}
 
@@ -40,6 +46,7 @@ func insertPosition(
 	amount float64,
 	positionType string,
 	status string,
+	timestamp time.Time,
 ) (map[string]interface{}, error) {
 	query := `
 		INSERT INTO position (` + positionColumnsString + `
@@ -50,8 +57,10 @@ func insertPosition(
 			$3,
 			$4,
 			$5,
+			$6,
 			DEFAULT,
-			DEFAULT,
+			NULL,
+			NULL,
 			NULL
 		)
 		RETURNING ` + positionColumnsString
@@ -62,7 +71,33 @@ func insertPosition(
 		amount,
 		positionType,
 		status,
+		timestamp,
 	}
+
+	return database.QueryRow(query, params, positionColumns)
+}
+
+func updatePositionRow(
+	positionID int64,
+	fieldsToUpdate map[string]interface{},
+) (map[string]interface{}, error) {
+	params := []interface{}{
+		positionID,
+	}
+
+	setParts := make([]string, 0)
+	placeholder := 2
+	for key, value := range fieldsToUpdate {
+		setParts = append(setParts, fmt.Sprintf("%s = $%d", key, placeholder))
+		placeholder++
+		params = append(params, value)
+	}
+
+	query := `
+		UPDATE position
+		SET ` + strings.Join(setParts, ", ") + `
+		WHERE position_id = $1
+		RETURNING ` + positionColumnsString
 
 	return database.QueryRow(query, params, positionColumns)
 }

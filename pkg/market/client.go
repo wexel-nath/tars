@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -88,7 +88,7 @@ func post(
 
 func unmarshalBody(r *http.Response, v interface{}) error {
 	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}

@@ -1,13 +1,13 @@
 package bot
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
 	"tars/pkg/config"
 	"tars/pkg/log"
 	"tars/pkg/market"
+	"tars/pkg/position"
 )
 
 type Simple struct{
@@ -46,51 +46,21 @@ func (s Simple) run(timestamp time.Time) (bool, error) {
 func placeOrder(ticker market.Ticker) error {
 	log.Info("ticker price: %s", ticker.LastPrice)
 
-	request, err := buildBuyOrderRequest(ticker.LastPrice)
+	price, err := strconv.ParseFloat(ticker.LastPrice, 64)
 	if err != nil {
 		return err
 	}
 
-	log.Info("placing order. market[%s] amount[%s]", request.MarketID, request.Amount)
+	amount := config.Get().PositionSize / price
 
-	order, err := market.PlaceOrder(request, ticker.Timestamp)
+	log.Info("placing order. market[%s] price[%f] amount[%f]", ticker.MarketID, price, amount)
+
+	p, err := position.Open(ticker.MarketID, price, amount, position.TypeLong, ticker.Timestamp)
 	if err != nil {
 		return err
 	}
 
-	log.Info("order status: %s", order.Status)
-
-	orderTrades, err := market.GetTradesByOrderID(order.ID)
-	if err != nil {
-		return err
-	}
-
-	for _, trade := range orderTrades {
-		log.Info("trade fee: %s", trade.Fee)
-	}
+	log.Info("position is open: %#v", p)
 
 	return nil
-}
-
-func buildBuyOrderRequest(
-	price string,
-) (market.OrderRequest, error) {
-	cfg := config.Get()
-
-	priceFloat, err := strconv.ParseFloat(price, 64)
-	if err != nil {
-		return market.OrderRequest{}, err
-	}
-
-	amount := cfg.PositionSize / priceFloat
-
-	request := market.OrderRequest{
-		MarketID: cfg.MarketID,
-		Price:    price,
-		Amount:   fmt.Sprintf("%f", amount),
-		Side:     market.SideBid,
-		Type:     market.TypeLimit,
-	}
-
-	return request, nil
 }
