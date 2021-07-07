@@ -50,23 +50,9 @@ func positionFromRow(row map[string]interface{}) (p Position, err error) {
 		Status:          row[columnPositionStatus].(string),
 		Created:         row[columnPositionCreated].(time.Time),
 		Updated:         row[columnPositionUpdated].(time.Time),
-	}
-
-	// nullable fields
-
-	externalOrderID := row[columnExternalOrderID]
-	if externalOrderID != nil {
-		*position.ExternalOrderID = externalOrderID.(string)
-	}
-
-	openFee := row[columnOpenFee]
-	if openFee != nil {
-		*position.OpenFee = parse.MustParseFloat(openFee)
-	}
-
-	closeFee := row[columnCloseFee]
-	if closeFee != nil {
-		*position.CloseFee = parse.MustParseFloat(closeFee)
+		OpenFee:         parse.FloatPointer(row[columnOpenFee]),
+		CloseFee:        parse.FloatPointer(row[columnCloseFee]),
+		ExternalOrderID: parse.StringPointer(row[columnExternalOrderID]),
 	}
 
 	return position, nil
@@ -103,19 +89,19 @@ func updatePosition(
 ) (Position, error) {
 	fieldsToUpdate := make(map[string]interface{})
 
-	if status != nil && *status != position.Status {
+	if status != nil {
 		fieldsToUpdate[columnPositionStatus] = *status
 	}
 
-	if openFee != nil && *openFee != *position.OpenFee {
+	if openFee != nil {
 		fieldsToUpdate[columnOpenFee] = *openFee
 	}
 
-	if closeFee != nil && *closeFee != *position.CloseFee {
+	if closeFee != nil {
 		fieldsToUpdate[columnCloseFee] = *closeFee
 	}
 
-	if externalOrderID != nil && *externalOrderID != *position.ExternalOrderID {
+	if externalOrderID != nil {
 		fieldsToUpdate[columnExternalOrderID] = *externalOrderID
 	}
 

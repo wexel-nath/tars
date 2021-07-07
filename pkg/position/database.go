@@ -49,7 +49,7 @@ func insertPosition(
 	timestamp time.Time,
 ) (map[string]interface{}, error) {
 	query := `
-		INSERT INTO position (` + positionColumnsString + `
+		INSERT INTO position (` + positionColumnsString + `)
 		VALUES (
 			DEFAULT,
 			$1,

@@ -6,35 +6,42 @@ PROJ_DIR="$(readlink -f "$SCRIPT_DIR/..")"
 cd "$PROJ_DIR"
 
 PROJECT_NAME="${PROJECT_NAME:-tars}"
-VERSION="${VERSION:-$(cat "$PROJ_DIR/VERSION")}"
+export VERSION="${VERSION:-$(cat "$PROJ_DIR/VERSION")}"
 
 # local fake-btc-market values
-marketID='BTC-USD'
-marketBaseURL='https://172.21.0.1/fake-btc-markets'
-initialDate='2018-01-01T01:00:00Z'
-tickerDelta='60'
-positionSize='1000'
+export MARKET_ID='BTC-USD'
+export MARKET_BASE_URL='https://172.21.0.1/fake-btc-markets'
+export INITIAL_DATE='2018-01-01T01:00:00Z'
+export TICKER_DELTA='60'
+export POSITION_SIZE='1000'
 
 # prod fake-btc-market values
-#marketID='ETH-USD'
-#marketBaseURL='https://api.getwexel.com/fake-btc-markets'
-#initialDate='2016-01-01T00:10:00Z'
-#tickerDelta='10'
-#positionSize='1000'
+#export MARKET_ID='ETH-USD'
+#export MARKET_BASE_URL='https://api.getwexel.com/fake-btc-markets'
+#export INITIAL_DATE='2016-01-01T00:10:00Z'
+#export TICKER_DELTA='10'
+#export POSITION_SIZE='1000'
+
+deploy() {
+	docker stack deploy \
+		--compose-file 'docker/docker-stack.yml' \
+		"$PROJECT_NAME"
+}
 
 run() {
 	image="wexel/$PROJECT_NAME-$1"
 	name="tars_$1"
 
 	docker run \
-		-e "MARKET_ID=$marketID" \
-		-e "MARKET_BASE_URL=$marketBaseURL" \
-		-e "INITIAL_DATE=$initialDate" \
-		-e "TICKER_DELTA=$tickerDelta" \
-		-e "POSITION_SIZE=$positionSize" \
+		-e "MARKET_ID=$MARKET_ID" \
+		-e "MARKET_BASE_URL=$MARKET_BASE_URL" \
+		-e "INITIAL_DATE=$INITIAL_DATE" \
+		-e "TICKER_DELTA=$TICKER_DELTA" \
+		-e "POSITION_SIZE=$POSITION_SIZE" \
 		--rm \
 		--name "$name" \
 		"$image:$VERSION"
 }
 
-run bot
+#run bot
+deploy
