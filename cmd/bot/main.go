@@ -3,7 +3,7 @@ package main
 import (
 	"tars/pkg/bot"
 	"tars/pkg/config"
-	"tars/pkg/database"
+	"tars/pkg/db"
 	"tars/pkg/log"
 )
 
@@ -13,7 +13,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, err = database.Connect()
+	_, err = db.Connect()
 	if err != nil {
 		log.Error(err)
 	}

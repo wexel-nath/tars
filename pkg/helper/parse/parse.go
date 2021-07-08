@@ -2,6 +2,7 @@ package parse
 
 import (
 	"strconv"
+	"time"
 )
 
 func StringToFloat(value string) (float64, error) {
@@ -54,5 +55,14 @@ func StringPointer(value interface{}) *string {
 	}
 
 	v := value.(string)
+	return &v
+}
+
+func TimePointer(value interface{}) *time.Time {
+	if value == nil {
+		return nil
+	}
+
+	v := value.(time.Time)
 	return &v
 }

@@ -5,13 +5,14 @@ import (
 
 	"tars/pkg/config"
 	"tars/pkg/log"
+	"tars/pkg/run"
 )
 
-type cycle interface{
-	run(timestamp time.Time) (bool, error)
+type Cycle interface{
+	run(runID int64, timestamp time.Time) (bool, error)
 }
 
-func Start(c cycle) error {
+func Start(c Cycle) error {
 	initialDate := config.Get().InitialDate
 	log.Info("Starting bot from initial date: %s", initialDate)
 
@@ -20,15 +21,38 @@ func Start(c cycle) error {
 		return err
 	}
 
-	//exit := false
-	for i := 0; i < 50; i++ {
-		_, err = c.run(timestamp)
+	r, err := run.NewRun()
+	if err != nil {
+		return err
+	}
+
+	for true {
+		exit, err := c.run(r.ID, timestamp)
 		if err != nil {
 			return err
 		}
 
+		if exit {
+			break
+		}
+
 		timestamp = timestamp.Add(config.Get().GetTickerDelta())
 	}
+
+	r, err = run.UpdateRun(r.ID)
+	if err != nil {
+		return err
+	}
+
+	d := r.Finished.Sub(r.Started)
+	log.Info("Finished in %.2f seconds", d.Seconds())
+
+	outcome, err := run.GetOutcome(r.ID)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Outcome: %#v", outcome)
 
 	return nil
 }

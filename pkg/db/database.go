@@ -1,4 +1,4 @@
-package database
+package db
 
 type Client interface {
 	Exec(query string, params []interface{}) error

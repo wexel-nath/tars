@@ -11,44 +11,46 @@ import (
 	"tars/pkg/position"
 )
 
-type Simple struct{
-	CycleTime         time.Duration
-	LastPurchasePrice float64
-	Market            string
+type simple struct{
+	cycleTime         time.Duration
+	previousTimestamp time.Time
+	lastPurchasePrice float64
 }
 
-func (s Simple) shouldBuy(price float64, totalExposure float64) bool {
-	cfg := config.Get()
-	return price <= s.LastPurchasePrice * cfg.PositionEnter &&
-		totalExposure < cfg.MaxExposure
-}
-
-func NewSimple() *Simple {
-	log.Info("%f", config.Get().PositionEnter)
-
-	return &Simple{
-		CycleTime:         0,
-		LastPurchasePrice: 0,
-		Market:            config.Get().MarketID,
+func NewSimple() Cycle {
+	return &simple{
+		cycleTime:         0,
+		lastPurchasePrice: 0,
 	}
 }
 
-func (s *Simple) run(timestamp time.Time) (bool, error) {
-	ticker, err := market.GetTickerForTimestamp(s.Market, timestamp)
+func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
+	cfg := config.Get()
+
+	ticker, err := market.GetTickerForTimestamp(cfg.MarketID, timestamp)
 	if err != nil {
 		return true, err
 	}
 
-	price := parse.MustGetFloat(ticker.LastPrice)
-	if s.LastPurchasePrice == 0.0 {
-		log.Info("setting last price %f", price)
-		s.LastPurchasePrice = price
+	// end of tickers
+	if ticker.Timestamp == s.previousTimestamp {
+		return true, nil
 	}
+	s.previousTimestamp = ticker.Timestamp
 
 	// get open positions
-	openPositions, err := position.GetOpenPositions()
+	openPositions, err := position.GetOpenPositions(runID)
 	if err != nil {
 		return true, err
+	}
+
+	noOpen := len(openPositions) == 0
+
+	price := parse.MustGetFloat(ticker.LastPrice)
+	if s.lastPurchasePrice == 0.0 ||
+		(noOpen && price > s.lastPurchasePrice) {
+		log.Info("setting last price %f", price)
+		s.lastPurchasePrice = price
 	}
 
 	totalExposure := 0.0
@@ -67,23 +69,32 @@ func (s *Simple) run(timestamp time.Time) (bool, error) {
 	}
 
 	// maybe trigger buys
-	cfg := config.Get()
-	enterPrice := s.LastPurchasePrice * cfg.PositionEnter
-	if price <= enterPrice && totalExposure < cfg.MaxExposure {
-		err = placeOrder(ticker)
+	softEnterPrice := s.lastPurchasePrice * cfg.PositionSoftEnter
+	hardEnterPrice := s.lastPurchasePrice * cfg.PositionHardEnter
+	if totalExposure < cfg.MaxExposure && (
+		price <= hardEnterPrice ||
+		(price <= softEnterPrice && noOpen)) {
+
+		err = placeOrder(runID, ticker)
 		if err != nil {
 			return true, err
 		}
 
-		s.LastPurchasePrice = price
+		s.lastPurchasePrice = price
 	} else {
-		log.Info("not buying. price[%f] enterPrice[%f]", price, enterPrice)
+		log.Info(
+			"not buying. price[%f] softEnterPrice[%f] hardEnterPrice[%f] openPositions[%d]",
+			price,
+			softEnterPrice,
+			hardEnterPrice,
+			len(openPositions),
+		)
 	}
 
-	return true, nil
+	return false, nil
 }
 
-func placeOrder(ticker market.Ticker) error {
+func placeOrder(runID int64, ticker market.Ticker) error {
 	log.Info("ticker price: %s", ticker.LastPrice)
 
 	price, err := strconv.ParseFloat(ticker.LastPrice, 64)
@@ -95,7 +106,7 @@ func placeOrder(ticker market.Ticker) error {
 
 	log.Info("placing order. market[%s] price[%f] amount[%f]", ticker.MarketID, price, amount)
 
-	p, err := position.Open(ticker.MarketID, price, amount, position.TypeLong, ticker.Timestamp)
+	p, err := position.Open(runID, ticker.MarketID, price, amount, position.TypeLong, ticker.Timestamp)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"database/sql"
@@ -57,4 +57,8 @@ func maybeStripName(colName string) string {
 		return colName
 	}
 	return split[len(split) - 1]
+}
+
+func IsErrNoRows(err error) bool {
+	return err == sql.ErrNoRows
 }

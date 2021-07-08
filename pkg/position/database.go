@@ -5,48 +5,53 @@ import (
 	"strings"
 	"time"
 
-	"tars/pkg/database"
+	"tars/pkg/db"
 )
 
 const (
 	columnPositionID      = "position_id"
+	columnRunID           = "run_id"
 	columnMarketID        = "market_id"
-	columnPositionPrice   = "position_price"
-	columnPositionAmount  = "position_amount"
 	columnPositionType    = "position_type"
 	columnPositionStatus  = "position_status"
 	columnPositionCreated = "position_created"
-	columnPositionUpdated = "position_updated"
+	columnAmount          = "amount"
+	columnOpenPrice       = "open_price"
+	columnClosePrice      = "close_price"
 	columnOpenFee         = "open_fee"
 	columnCloseFee        = "close_fee"
-	columnExternalOrderID = "external_order_id"
+	columnOpenOrderID     = "open_order_id"
+	columnCloseOrderID    = "close_order_id"
 )
 
 var (
 	positionColumns = []string{
 		columnPositionID,
+		columnRunID,
 		columnMarketID,
-		columnPositionPrice,
-		columnPositionAmount,
 		columnPositionType,
 		columnPositionStatus,
 		columnPositionCreated,
-		columnPositionUpdated,
+		columnAmount,
+		columnOpenPrice,
+		columnClosePrice,
 		columnOpenFee,
 		columnCloseFee,
-		columnExternalOrderID,
+		columnOpenOrderID,
+		columnCloseOrderID,
 	}
 
 	positionColumnsString = strings.Join(positionColumns, ", ")
 )
 
 func insertPosition(
+	runID int64,
 	marketID string,
-	price float64,
-	amount float64,
 	positionType string,
 	status string,
 	timestamp time.Time,
+	amount float64,
+	price float64,
 ) (map[string]interface{}, error) {
 	query := `
 		INSERT INTO position (` + positionColumnsString + `)
@@ -58,7 +63,9 @@ func insertPosition(
 			$4,
 			$5,
 			$6,
+			$7,
 			DEFAULT,
+			NULL,
 			NULL,
 			NULL,
 			NULL
@@ -66,48 +73,47 @@ func insertPosition(
 		RETURNING ` + positionColumnsString
 
 	params := []interface{}{
+		runID,
 		marketID,
-		price,
-		amount,
 		positionType,
 		status,
 		timestamp,
+		amount,
+		price,
 	}
 
-	return database.QueryRow(query, params, positionColumns)
+	return db.QueryRow(query, params, positionColumns)
 }
 
 func updatePositionRow(
 	positionID int64,
-	fieldsToUpdate map[string]interface{},
+	u db.Updater,
 ) (map[string]interface{}, error) {
-	params := []interface{}{
-		positionID,
-	}
-
-	setParts := make([]string, 0)
-	placeholder := 2
-	for key, value := range fieldsToUpdate {
-		setParts = append(setParts, fmt.Sprintf("%s = $%d", key, placeholder))
-		placeholder++
-		params = append(params, value)
-	}
-
-	query := `
+	queryFormat := `
 		UPDATE position
-		SET ` + strings.Join(setParts, ", ") + `
-		WHERE position_id = $1
-		RETURNING ` + positionColumnsString
+		SET %s
+		WHERE position_id = $%d
+		RETURNING %s
+	`
 
-	return database.QueryRow(query, params, positionColumns)
+	updateParams, setString := u.Output(1)
+	params := append(updateParams, positionID)
+	query := fmt.Sprintf(queryFormat, setString, len(params), positionColumnsString)
+
+	return db.QueryRow(query, params, positionColumns)
 }
 
-func selectOpenPositions() ([]map[string]interface{}, error) {
+func selectOpenPositions(runID int64) ([]map[string]interface{}, error) {
 	query := `
 		SELECT ` + positionColumnsString + `
 		FROM position
-		WHERE position_status = 'Open'
+		WHERE run_id = $1
+		AND position_status = 'Open'
 	`
 
-	return database.QueryRows(query, nil, positionColumns)
+	params := []interface{}{
+		runID,
+	}
+
+	return db.QueryRows(query, params, positionColumns)
 }

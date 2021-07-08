@@ -5,37 +5,39 @@ import (
 	"time"
 
 	"tars/pkg/config"
+	"tars/pkg/db"
 	"tars/pkg/helper/parse"
 	"tars/pkg/log"
 	"tars/pkg/market"
 )
 
 type Position struct{
-	ID              int64
-	MarketID        string
-	Price           float64
-	Amount          float64
-	Type            string
-	Status          string
-	Created         time.Time
-	Updated         time.Time
-	OpenFee         *float64
-	CloseFee        *float64
-	ExternalOrderID *string
+	ID           int64
+	MarketID     string
+	Type         string
+	Status       string
+	Created      time.Time
+	Amount       float64
+	OpenPrice    float64
+	ClosePrice   *float64
+	OpenFee      *float64
+	CloseFee     *float64
+	OpenOrderID  *string
+	CloseOrderID *string
 }
 
 func (p Position) TargetPrice() float64 {
-	return p.Price * config.Get().PositionTarget
+	return p.OpenPrice * config.Get().PositionTarget
 }
 
 func (p Position) Cost() float64 {
-	return p.Price * p.Amount
+	return p.OpenPrice * p.Amount
 }
 
 func (p Position) enterOrderRequest() market.OrderRequest {
 	request := market.OrderRequest{
 		MarketID: p.MarketID,
-		Price:    fmt.Sprintf("%f", p.Price),
+		Price:    fmt.Sprintf("%f", p.OpenPrice),
 		Amount:   fmt.Sprintf("%f", p.Amount),
 		Side:     enterOrderSide(p.Type),
 		Type:     market.TypeLimit, // always limit for now
@@ -64,17 +66,18 @@ func positionFromRow(row map[string]interface{}) (p Position, err error) {
 	}()
 
 	position := Position{
-		ID:              row[columnPositionID].(int64),
-		MarketID:        row[columnMarketID].(string),
-		Price:           parse.MustParseFloat(row[columnPositionPrice]),
-		Amount:          parse.MustParseFloat(row[columnPositionAmount]),
-		Type:            row[columnPositionType].(string),
-		Status:          row[columnPositionStatus].(string),
-		Created:         row[columnPositionCreated].(time.Time),
-		Updated:         row[columnPositionUpdated].(time.Time),
-		OpenFee:         parse.FloatPointer(row[columnOpenFee]),
-		CloseFee:        parse.FloatPointer(row[columnCloseFee]),
-		ExternalOrderID: parse.StringPointer(row[columnExternalOrderID]),
+		ID:           row[columnPositionID].(int64),
+		MarketID:     row[columnMarketID].(string),
+		Type:         row[columnPositionType].(string),
+		Status:       row[columnPositionStatus].(string),
+		Created:      row[columnPositionCreated].(time.Time),
+		Amount:       parse.MustParseFloat(row[columnAmount]),
+		OpenPrice:    parse.MustParseFloat(row[columnOpenPrice]),
+		ClosePrice:   parse.FloatPointer(row[columnClosePrice]),
+		OpenFee:      parse.FloatPointer(row[columnOpenFee]),
+		CloseFee:     parse.FloatPointer(row[columnCloseFee]),
+		OpenOrderID:  parse.StringPointer(row[columnOpenOrderID]),
+		CloseOrderID: parse.StringPointer(row[columnCloseOrderID]),
 	}
 
 	return position, nil
@@ -97,19 +100,21 @@ func positionsFromRows(rows []map[string]interface{}) ([]Position, error) {
 }
 
 func newPosition(
+	runID int64,
 	marketID string,
-	price float64,
-	amount float64,
 	positionType string,
+	amount float64,
+	price float64,
 	timestamp time.Time,
 ) (Position, error) {
 	row, err := insertPosition(
+		runID,
 		marketID,
-		price,
-		amount,
 		positionType,
 		StatusCreated,
 		timestamp,
+		amount,
+		price,
 	)
 	if err != nil {
 		return Position{}, err
@@ -118,36 +123,12 @@ func newPosition(
 	return positionFromRow(row)
 }
 
-func updatePosition(
-	position Position,
-	status *string,
-	openFee *float64,
-	closeFee *float64,
-	externalOrderID *string,
-) (Position, error) {
-	fieldsToUpdate := make(map[string]interface{})
-
-	if status != nil {
-		fieldsToUpdate[columnPositionStatus] = *status
-	}
-
-	if openFee != nil {
-		fieldsToUpdate[columnOpenFee] = *openFee
-	}
-
-	if closeFee != nil {
-		fieldsToUpdate[columnCloseFee] = *closeFee
-	}
-
-	if externalOrderID != nil {
-		fieldsToUpdate[columnExternalOrderID] = *externalOrderID
-	}
-
-	if len(fieldsToUpdate) == 0 {
+func updatePosition(position Position, u db.Updater) (Position, error) {
+	if !u.ShouldUpdate() {
 		return position, nil
 	}
 
-	row, err := updatePositionRow(position.ID, fieldsToUpdate)
+	row, err := updatePositionRow(position.ID, u)
 	if err != nil {
 		return Position{}, err
 	}
@@ -156,13 +137,14 @@ func updatePosition(
 }
 
 func Open(
+	runID int64,
 	marketID string,
 	price float64,
 	amount float64,
 	positionType string,
 	timestamp time.Time,
 ) (Position, error) {
-	p, err := newPosition(marketID, price, amount, positionType, timestamp)
+	p, err := newPosition(runID, marketID, positionType, amount, price, timestamp)
 	if err != nil {
 		return Position{}, err
 	}
@@ -179,8 +161,10 @@ func Open(
 		// try cancel order
 
 		// mark position as cancelled
-		status := StatusCancelled
-		return updatePosition(p, &status, nil, nil, &order.ID)
+		u := db.NewUpdater().
+			Set(columnPositionStatus, StatusCancelled).
+			Set(columnOpenOrderID, order.ID)
+		return updatePosition(p, u)
 	}
 
 	orderTrades, err := market.GetTradesByOrderID(order.ID)
@@ -188,18 +172,17 @@ func Open(
 		return Position{}, err
 	}
 
-	totalFee := 0.0
+	openFee := 0.0
 	for _, trade := range orderTrades {
-		fee, err := parse.StringToFloat(trade.Fee)
-		if err != nil {
-			return Position{}, err
-		}
-
-		totalFee += fee
+		openFee += parse.MustGetFloat(trade.Fee)
 	}
 
-	status := StatusOpen
-	return updatePosition(p, &status, &totalFee, nil, &order.ID)
+
+	u := db.NewUpdater().
+		Set(columnPositionStatus, StatusOpen).
+		Set(columnOpenFee, openFee).
+		Set(columnOpenOrderID, order.ID)
+	return updatePosition(p, u)
 }
 
 func (p Position) Close(price float64, timestamp time.Time) (Position, error) {
@@ -214,9 +197,8 @@ func (p Position) Close(price float64, timestamp time.Time) (Position, error) {
 
 		// try cancel order | position_event??
 
-		// mark position as cancelled
-		status := StatusCancelled
-		return updatePosition(p, &status, nil, nil, &order.ID)
+		// leave position open
+		return Position{}, fmt.Errorf("failed closing position[%d]", p.ID)
 	}
 
 	orderTrades, err := market.GetTradesByOrderID(order.ID)
@@ -224,22 +206,21 @@ func (p Position) Close(price float64, timestamp time.Time) (Position, error) {
 		return Position{}, err
 	}
 
-	totalFee := 0.0
+	closeFee := 0.0
 	for _, trade := range orderTrades {
-		fee, err := parse.StringToFloat(trade.Fee)
-		if err != nil {
-			return Position{}, err
-		}
-
-		totalFee += fee
+		closeFee += parse.MustGetFloat(trade.Fee)
 	}
 
-	status := StatusClosed
-	return updatePosition(p, &status, nil, &totalFee, &order.ID)
+	u := db.NewUpdater().
+		Set(columnPositionStatus, StatusClosed).
+		Set(columnCloseFee, closeFee).
+		Set(columnClosePrice, parse.MustGetFloat(order.Price)).
+		Set(columnCloseOrderID, order.ID)
+	return updatePosition(p, u)
 }
 
-func GetOpenPositions() ([]Position, error) {
-	rows, err := selectOpenPositions()
+func GetOpenPositions(runID int64) ([]Position, error) {
+	rows, err := selectOpenPositions(runID)
 	if err != nil {
 		return nil, err
 	}
