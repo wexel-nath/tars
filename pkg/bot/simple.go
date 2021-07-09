@@ -14,14 +14,18 @@ import (
 type simple struct{
 	cycleTime         time.Duration
 	previousTimestamp time.Time
-	lastPurchasePrice float64
+	maxOpenPositions  int
+	lastPrice         float64
 }
 
 func NewSimple() Cycle {
 	return &simple{
-		cycleTime:         0,
-		lastPurchasePrice: 0,
+		lastPrice: 0,
 	}
+}
+
+func (s *simple) getMaxOpenPositions() int {
+	return s.maxOpenPositions
 }
 
 func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
@@ -44,13 +48,18 @@ func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
 		return true, err
 	}
 
-	noOpen := len(openPositions) == 0
+	numPositions := len(openPositions)
+	noOpen := numPositions == 0
+
+	if numPositions > s.maxOpenPositions {
+		s.maxOpenPositions = numPositions
+	}
 
 	price := parse.MustGetFloat(ticker.LastPrice)
-	if s.lastPurchasePrice == 0.0 ||
-		(noOpen && price > s.lastPurchasePrice) {
+	if s.lastPrice == 0.0 ||
+		(noOpen && price > s.lastPrice) {
 		log.Info("setting last price %f", price)
-		s.lastPurchasePrice = price
+		s.lastPrice = price
 	}
 
 	totalExposure := 0.0
@@ -63,14 +72,16 @@ func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
 			if err != nil {
 				log.Error(err)
 			}
+
+			s.lastPrice = price
 		}
 
 		totalExposure += p.Cost()
 	}
 
 	// maybe trigger buys
-	softEnterPrice := s.lastPurchasePrice * cfg.PositionSoftEnter
-	hardEnterPrice := s.lastPurchasePrice * cfg.PositionHardEnter
+	softEnterPrice := s.lastPrice * cfg.PositionSoftEnter
+	hardEnterPrice := s.lastPrice * cfg.PositionHardEnter
 	if totalExposure < cfg.MaxExposure && (
 		price <= hardEnterPrice ||
 		(price <= softEnterPrice && noOpen)) {
@@ -80,7 +91,7 @@ func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
 			return true, err
 		}
 
-		s.lastPurchasePrice = price
+		s.lastPrice = price
 	} else {
 		log.Info(
 			"not buying. price[%f] softEnterPrice[%f] hardEnterPrice[%f] openPositions[%d]",

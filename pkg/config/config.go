@@ -16,6 +16,7 @@ type Config struct{
 	Version  string `env:"VERSION"`
 
 	// Bot
+	FeePercentage     float64 `env:"FEE_PERCENTAGE"`
 	InitialDate       string  `env:"INITIAL_DATE"`
 	MarketBaseURL     string  `env:"MARKET_BASE_URL"`
 	MarketID          string  `env:"MARKET_ID"`

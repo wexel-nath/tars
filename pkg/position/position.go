@@ -149,73 +149,72 @@ func Open(
 		return Position{}, err
 	}
 
-	request := p.enterOrderRequest()
-	order, err := market.PlaceOrder(request, p.Created)
-	if err != nil {
-		return Position{}, err
-	}
-
-	if order.Status != market.StatusFullyMatched {
-		// log/alert
-
-		// try cancel order
-
-		// mark position as cancelled
-		u := db.NewUpdater().
-			Set(columnPositionStatus, StatusCancelled).
-			Set(columnOpenOrderID, order.ID)
-		return updatePosition(p, u)
-	}
-
-	orderTrades, err := market.GetTradesByOrderID(order.ID)
-	if err != nil {
-		return Position{}, err
-	}
-
-	openFee := 0.0
-	for _, trade := range orderTrades {
-		openFee += parse.MustGetFloat(trade.Fee)
-	}
-
+	//request := p.enterOrderRequest()
+	//order, err := market.PlaceOrder(request, p.Created)
+	//if err != nil {
+	//	return Position{}, err
+	//}
+	//
+	//if order.Status != market.StatusFullyMatched {
+	//	// log/alert
+	//
+	//	// try cancel order
+	//
+	//	// mark position as cancelled
+	//	u := db.NewUpdater().
+	//		Set(columnPositionStatus, StatusCancelled).
+	//		Set(columnOpenOrderID, order.ID)
+	//	return updatePosition(p, u)
+	//}
+	//
+	//orderTrades, err := market.GetTradesByOrderID(order.ID)
+	//if err != nil {
+	//	return Position{}, err
+	//}
+	//
+	//openFee := 0.0
+	//for _, trade := range orderTrades {
+	//	openFee += parse.MustGetFloat(trade.Fee)
+	//}
 
 	u := db.NewUpdater().
 		Set(columnPositionStatus, StatusOpen).
-		Set(columnOpenFee, openFee).
-		Set(columnOpenOrderID, order.ID)
+		Set(columnOpenFee, calculateTradeFee(price, amount)).
+		Set(columnOpenOrderID, "")
 	return updatePosition(p, u)
 }
 
 func (p Position) Close(price float64, timestamp time.Time) (Position, error) {
-	request := p.exitOrderRequest(price)
-	order, err := market.PlaceOrder(request, timestamp)
-	if err != nil {
-		return Position{}, err
-	}
-
-	if order.Status != market.StatusFullyMatched {
-		// log/alert
-
-		// try cancel order | position_event??
-
-		// leave position open
-		return Position{}, fmt.Errorf("failed closing position[%d]", p.ID)
-	}
-
-	orderTrades, err := market.GetTradesByOrderID(order.ID)
-	if err != nil {
-		return Position{}, err
-	}
-
-	closeFee := 0.0
-	for _, trade := range orderTrades {
-		closeFee += parse.MustGetFloat(trade.Fee)
-	}
+	//request := p.exitOrderRequest(price)
+	//order, err := market.PlaceOrder(request, timestamp)
+	//if err != nil {
+	//	return Position{}, err
+	//}
+	//
+	//if order.Status != market.StatusFullyMatched {
+	//	// log/alert
+	//
+	//	// try cancel order | position_event??
+	//
+	//	// leave position open
+	//	return Position{}, fmt.Errorf("failed closing position[%d]", p.ID)
+	//}
+	//
+	//orderTrades, err := market.GetTradesByOrderID(order.ID)
+	//if err != nil {
+	//	return Position{}, err
+	//}
+	//
+	//closeFee := 0.0
+	//for _, trade := range orderTrades {
+	//	closeFee += parse.MustGetFloat(trade.Fee)
+	//}
 
 	u := db.NewUpdater().
 		Set(columnPositionStatus, StatusClosed).
-		Set(columnCloseFee, closeFee).
-		Set(columnClosePrice, parse.MustGetFloat(order.Price)).
-		Set(columnCloseOrderID, order.ID)
+		Set(columnCloseFee, calculateTradeFee(price, p.Amount)).
+		Set(columnClosePrice, price).
+		Set(columnCloseOrderID, "")
 	return updatePosition(p, u)
 }
 
@@ -226,4 +225,8 @@ func GetOpenPositions(runID int64) ([]Position, error) {
 	}
 
 	return positionsFromRows(rows)
+}
+
+func calculateTradeFee(price float64, amount float64) float64 {
+	return price * amount * config.Get().FeePercentage
 }

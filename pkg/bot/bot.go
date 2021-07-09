@@ -10,6 +10,7 @@ import (
 
 type Cycle interface{
 	run(runID int64, timestamp time.Time) (bool, error)
+	getMaxOpenPositions() int
 }
 
 func Start(c Cycle) error {
@@ -46,6 +47,7 @@ func Start(c Cycle) error {
 
 	d := r.Finished.Sub(r.Started)
 	log.Info("Finished in %.2f seconds", d.Seconds())
+	log.Info("Max Open Positions: %d", c.getMaxOpenPositions())
 
 	outcome, err := run.GetOutcome(r.ID)
 	if err != nil {

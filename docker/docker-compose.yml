@@ -7,6 +7,7 @@ services:
   bot:
     image: "wexel/tars-bot:${VERSION:-latest}"
     environment:
+      FEE_PERCENTAGE: "${FEE_PERCENTAGE:-}"
       INITIAL_DATE: "${INITIAL_DATE:-}"
       MARKET_BASE_URL: "${MARKET_BASE_URL:-}"
       MARKET_ID: "${MARKET_ID:-}"
@@ -24,6 +25,8 @@ services:
       VERSION: "${VERSION:-latest}"
     networks:
       - tars-backend
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     deploy:
       restart_policy:
         condition: none
@@ -43,6 +46,8 @@ services:
 
   db-init:
     image: "wexel/tars-db-init:${VERSION:-latest}"
+    depends_on:
+      - db
     environment:
       DB_HOST: "${DB_HOST:-db}"
       DB_NAME: "${DB_NAME:-tars}"
