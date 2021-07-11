@@ -1,11 +1,9 @@
 package bot
 
 import (
-	"strconv"
 	"time"
 
 	"tars/pkg/config"
-	"tars/pkg/helper/parse"
 	"tars/pkg/log"
 	"tars/pkg/market"
 	"tars/pkg/position"
@@ -97,8 +95,6 @@ func handle(runID int64, timestamp time.Time, bot Bot) error {
 		return err
 	}
 
-	price := parse.MustGetFloat(ticker.LastPrice)
-
 	// maybe trigger sells
 	for _, p := range openPositions {
 		shouldClose, err := bot.shouldClose(ticker, p)
@@ -106,8 +102,8 @@ func handle(runID int64, timestamp time.Time, bot Bot) error {
 			return err
 		}
 		if shouldClose {
-			log.Info("selling position[%d] at price[%s]", p.ID, ticker.LastPrice)
-			_, err = p.Close(price, timestamp)
+			log.Info("selling position[%d] at price[%f]", p.ID, ticker.LastPrice)
+			_, err = p.Close(ticker.LastPrice, timestamp)
 			if err != nil {
 				return err
 			}
@@ -125,31 +121,26 @@ func handle(runID int64, timestamp time.Time, bot Bot) error {
 			return err
 		}
 	} else {
-		log.Info("not buying. price[%s]", ticker.LastPrice)
+		log.Info("not buying. price[%f]", ticker.LastPrice)
 	}
 
 	return nil
 }
 
 func placeOrder(runID int64, ticker market.Ticker) error {
-	log.Info("ticker price: %s", ticker.LastPrice)
+	log.Info("ticker price: %f", ticker.LastPrice)
 
-	price, err := strconv.ParseFloat(ticker.LastPrice, 64)
-	if err != nil {
-		return err
-	}
+	amount := config.Get().PositionSize / ticker.LastPrice
 
-	amount := config.Get().PositionSize / price
+	log.Info("placing order. market[%s] price[%f] amount[%f]", ticker.MarketID, ticker.LastPrice, amount)
 
-	log.Info("placing order. market[%s] price[%f] amount[%f]", ticker.MarketID, price, amount)
-
-	p, err := position.Open(runID, ticker.MarketID, price, amount, position.TypeLong, ticker.Timestamp)
+	p, err := position.Open(runID, ticker.MarketID, ticker.LastPrice, amount, position.TypeLong, ticker.Timestamp)
 	if err != nil {
 		return err
 	}
 
 	log.Info("position is open: %#v", p)
+	log.Info("open fee: %f", *p.OpenFee)
 
 	return nil
 }
-

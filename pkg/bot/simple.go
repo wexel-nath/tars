@@ -2,7 +2,6 @@ package bot
 
 import (
 	"tars/pkg/config"
-	"tars/pkg/helper/parse"
 	"tars/pkg/log"
 	"tars/pkg/market"
 	"tars/pkg/position"
@@ -17,31 +16,27 @@ func NewSimpleBot() *SimpleBot {
 }
 
 func (s *SimpleBot) preOpen(ticker market.Ticker) {
-	price := parse.MustGetFloat(ticker.LastPrice)
-	if price > s.lastPrice || s.lastPrice == 0.0 {
-		log.Info("setting last price %f", price)
-		s.lastPrice = price
+	if ticker.LastPrice > s.lastPrice || s.lastPrice == 0.0 {
+		log.Info("setting last price %f", ticker.LastPrice)
+		s.lastPrice = ticker.LastPrice
 	}
 }
 
 func (s *SimpleBot) shouldOpen(ticker market.Ticker) (bool, error) {
-	price := parse.MustGetFloat(ticker.LastPrice)
 	hardEnterPrice := s.lastPrice * config.Get().PositionHardEnter
 
-	shouldOpen := price <= hardEnterPrice
+	shouldOpen := ticker.LastPrice <= hardEnterPrice
 	if shouldOpen {
-		s.lastPrice = price
+		s.lastPrice = ticker.LastPrice
 	}
 
 	return shouldOpen, nil
 }
 
 func (s *SimpleBot) shouldClose(ticker market.Ticker, p position.Position) (bool, error) {
-	price := parse.MustGetFloat(ticker.LastPrice)
-
-	shouldClose := price >= p.TargetPrice()
+	shouldClose := ticker.LastPrice >= p.TargetPrice()
 	if shouldClose {
-		s.lastPrice = price
+		s.lastPrice = ticker.LastPrice
 	}
 
 	return shouldClose, nil

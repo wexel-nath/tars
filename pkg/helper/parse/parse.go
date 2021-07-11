@@ -10,7 +10,11 @@ func StringToFloat(value string) (float64, error) {
 }
 
 func MustGetFloat(value string) float64 {
-	f, _ := StringToFloat(value)
+	f, err := StringToFloat(value)
+	if err != nil {
+		panic(err)
+	}
+
 	return f
 }
 
