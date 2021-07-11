@@ -75,7 +75,20 @@ func Start(bot Bot) error {
 		return err
 	}
 
-	log.Info("Outcome: %#v", outcome)
+	lastTicker, err := market.GetTickerForTimestamp(outcome.MarketID, endDate)
+	if err != nil {
+		return err
+	}
+
+	portfolioValue := (outcome.AmountHeld * lastTicker.LastPrice) + outcome.TotalSold - outcome.TotalFees
+	log.Info("Total Spend: %.2f", outcome.TotalSpend)
+	log.Info("Total Sold: %.2f", outcome.TotalSold)
+	log.Info("Amount Held: %f", outcome.AmountHeld)
+	log.Info("Positions Opened: %d", outcome.PositionsOpened)
+	log.Info("Positions Closed: %d", outcome.PositionsClosed)
+	log.Info("Total Fees: %.2f", outcome.TotalFees)
+	log.Info("Portfolio Value: %.2f", portfolioValue)
+	log.Info("Profit: %.2f", portfolioValue - outcome.TotalSpend)
 
 	return nil
 }
