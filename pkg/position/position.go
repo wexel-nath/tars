@@ -26,10 +26,6 @@ type Position struct{
 	CloseOrderID *string
 }
 
-func (p Position) TargetPrice() float64 {
-	return p.OpenPrice * config.Get().PositionTarget
-}
-
 func (p Position) Cost() float64 {
 	return p.OpenPrice * p.Amount
 }

@@ -16,17 +16,17 @@ type Config struct{
 	Version  string `env:"VERSION"`
 
 	// Bot
-	FeePercentage     float64 `env:"FEE_PERCENTAGE"`
-	StartDate         string  `env:"START_DATE"`
-	EndDate           string  `env:"END_DATE"`
-	MarketBaseURL     string  `env:"MARKET_BASE_URL"`
-	MarketID          string  `env:"MARKET_ID"`
-	MaxExposure       float64 `env:"MAX_EXPOSURE"`
-	PositionSoftEnter float64 `env:"POSITION_SOFT_ENTER"`
-	PositionHardEnter float64 `env:"POSITION_HARD_ENTER"`
-	PositionSize      float64 `env:"POSITION_SIZE"`
-	PositionTarget    float64 `env:"POSITION_TARGET"`
-	TickerDelta       int     `env:"TICKER_DELTA"`
+	FeePercentage float64 `env:"FEE_PERCENTAGE"`
+	StartDate     string  `env:"START_DATE"`
+	EndDate       string  `env:"END_DATE"`
+	MarketBaseURL string  `env:"MARKET_BASE_URL"`
+	MarketID      string  `env:"MARKET_ID"`
+	PositionSize  float64 `env:"POSITION_SIZE"`
+	TickerDelta   int     `env:"TICKER_DELTA"`
+
+	// SimpleBot
+	PositionEnter  float64 `env:"POSITION_ENTER"`
+	PositionTarget float64 `env:"POSITION_TARGET"`
 
 	// Database
 	DatabaseHost string `env:"DB_HOST"`

@@ -8,11 +8,17 @@ import (
 )
 
 type SimpleBot struct{
-	lastPrice float64
+	enterPricePercentage  float64
+	targetPricePercentage float64
+	lastPrice             float64
 }
 
 func NewSimpleBot() *SimpleBot {
-	return &SimpleBot{}
+	cfg := config.Get()
+	return &SimpleBot{
+		enterPricePercentage:  cfg.PositionEnter,
+		targetPricePercentage: cfg.PositionTarget,
+	}
 }
 
 func (s *SimpleBot) preOpen(ticker market.Ticker) {
@@ -23,9 +29,9 @@ func (s *SimpleBot) preOpen(ticker market.Ticker) {
 }
 
 func (s *SimpleBot) shouldOpen(ticker market.Ticker) (bool, error) {
-	hardEnterPrice := s.lastPrice * config.Get().PositionHardEnter
+	enterPrice := s.lastPrice * s.enterPricePercentage
 
-	shouldOpen := ticker.LastPrice <= hardEnterPrice
+	shouldOpen := ticker.LastPrice <= enterPrice
 	if shouldOpen {
 		s.lastPrice = ticker.LastPrice
 	}
@@ -34,7 +40,8 @@ func (s *SimpleBot) shouldOpen(ticker market.Ticker) (bool, error) {
 }
 
 func (s *SimpleBot) shouldClose(ticker market.Ticker, p position.Position) (bool, error) {
-	shouldClose := ticker.LastPrice >= p.TargetPrice()
+	targetPrice := p.OpenPrice * s.targetPricePercentage
+	shouldClose := ticker.LastPrice >= targetPrice
 	if shouldClose {
 		s.lastPrice = ticker.LastPrice
 	}
