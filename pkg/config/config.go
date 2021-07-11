@@ -17,7 +17,8 @@ type Config struct{
 
 	// Bot
 	FeePercentage     float64 `env:"FEE_PERCENTAGE"`
-	InitialDate       string  `env:"INITIAL_DATE"`
+	StartDate         string  `env:"START_DATE"`
+	EndDate           string  `env:"END_DATE"`
 	MarketBaseURL     string  `env:"MARKET_BASE_URL"`
 	MarketID          string  `env:"MARKET_ID"`
 	MaxExposure       float64 `env:"MAX_EXPOSURE"`

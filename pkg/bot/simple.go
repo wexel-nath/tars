@@ -1,9 +1,6 @@
 package bot
 
 import (
-	"strconv"
-	"time"
-
 	"tars/pkg/config"
 	"tars/pkg/helper/parse"
 	"tars/pkg/log"
@@ -11,118 +8,41 @@ import (
 	"tars/pkg/position"
 )
 
-type simple struct{
-	cycleTime         time.Duration
-	previousTimestamp time.Time
-	maxOpenPositions  int
-	lastPrice         float64
+type SimpleBot struct{
+	lastPrice float64
 }
 
-func NewSimple() Cycle {
-	return &simple{
-		lastPrice: 0,
-	}
+func NewSimpleBot() *SimpleBot {
+	return &SimpleBot{}
 }
 
-func (s *simple) getMaxOpenPositions() int {
-	return s.maxOpenPositions
-}
-
-func (s *simple) run(runID int64, timestamp time.Time) (bool, error) {
-	cfg := config.Get()
-
-	ticker, err := market.GetTickerForTimestamp(cfg.MarketID, timestamp)
-	if err != nil {
-		return true, err
-	}
-
-	// end of tickers
-	if ticker.Timestamp == s.previousTimestamp {
-		return true, nil
-	}
-	s.previousTimestamp = ticker.Timestamp
-
-	// get open positions
-	openPositions, err := position.GetOpenPositions(runID)
-	if err != nil {
-		return true, err
-	}
-
-	numPositions := len(openPositions)
-	noOpen := numPositions == 0
-
-	if numPositions > s.maxOpenPositions {
-		s.maxOpenPositions = numPositions
-	}
-
+func (s *SimpleBot) preOpen(ticker market.Ticker) {
 	price := parse.MustGetFloat(ticker.LastPrice)
-	if s.lastPrice == 0.0 ||
-		(noOpen && price > s.lastPrice) {
+	if price > s.lastPrice || s.lastPrice == 0.0 {
 		log.Info("setting last price %f", price)
 		s.lastPrice = price
 	}
-
-	totalExposure := 0.0
-
-	// maybe trigger sells
-	for _, p := range openPositions {
-		if price >= p.TargetPrice() {
-			log.Info("selling position[%d] at price[%f]", p.ID, price)
-			_, err = p.Close(price, timestamp)
-			if err != nil {
-				log.Error(err)
-			}
-
-			s.lastPrice = price
-		}
-
-		totalExposure += p.Cost()
-	}
-
-	// maybe trigger buys
-	softEnterPrice := s.lastPrice * cfg.PositionSoftEnter
-	hardEnterPrice := s.lastPrice * cfg.PositionHardEnter
-	if totalExposure < cfg.MaxExposure && (
-		price <= hardEnterPrice ||
-		(price <= softEnterPrice && noOpen)) {
-
-		err = placeOrder(runID, ticker)
-		if err != nil {
-			return true, err
-		}
-
-		s.lastPrice = price
-	} else {
-		log.Info(
-			"not buying. price[%f] softEnterPrice[%f] hardEnterPrice[%f] openPositions[%d]",
-			price,
-			softEnterPrice,
-			hardEnterPrice,
-			len(openPositions),
-		)
-	}
-
-	return false, nil
 }
 
-func placeOrder(runID int64, ticker market.Ticker) error {
-	log.Info("ticker price: %s", ticker.LastPrice)
+func (s *SimpleBot) shouldOpen(ticker market.Ticker) (bool, error) {
+	price := parse.MustGetFloat(ticker.LastPrice)
+	hardEnterPrice := s.lastPrice * config.Get().PositionHardEnter
 
-	price, err := strconv.ParseFloat(ticker.LastPrice, 64)
-	if err != nil {
-		return err
+	shouldOpen := price <= hardEnterPrice
+	if shouldOpen {
+		s.lastPrice = price
 	}
 
-	amount := config.Get().PositionSize / price
+	return shouldOpen, nil
+}
 
-	log.Info("placing order. market[%s] price[%f] amount[%f]", ticker.MarketID, price, amount)
+func (s *SimpleBot) shouldClose(ticker market.Ticker, p position.Position) (bool, error) {
+	price := parse.MustGetFloat(ticker.LastPrice)
 
-	p, err := position.Open(runID, ticker.MarketID, price, amount, position.TypeLong, ticker.Timestamp)
-	if err != nil {
-		return err
+	shouldClose := price >= p.TargetPrice()
+	if shouldClose {
+		s.lastPrice = price
 	}
 
-	log.Info("position is open: %#v", p)
-
-	return nil
+	return shouldClose, nil
 }
